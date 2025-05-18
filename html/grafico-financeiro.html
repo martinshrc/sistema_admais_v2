@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gráfico Financeiro</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f9fafb;
+            padding: 40px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        canvas {
+            max-width: 900px;
+            margin: auto;
+            display: block;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Entradas vs Saídas por Mês</h1>
+    <canvas id="financeChart" height="120"></canvas>
+
+    <script>
+        async function loadFinanceChart() {
+            const sheetId = '1pTZwzWasNz22LBLft6puozipSj761mHQI3TBBoIJQik';
+            const entradasUrl = `https://opensheet.vercel.app/${sheetId}/Entradas`;
+            const saidasUrl = `https://opensheet.vercel.app/${sheetId}/Saídas`;
+
+            const agruparPorMes = (dados) => {
+                const resultado = {};
+                dados.forEach(row => {
+                    const dataBr = row.Data?.trim();
+                    const valorTexto = row.Valor?.replace('R$', '').replace(/\s/g, '').replace(',', '.');
+                    const valor = parseFloat(valorTexto) || 0;
+
+                    if (!dataBr || isNaN(valor)) return;
+                    const [dia, mes, ano] = dataBr.split('/');
+                    if (!dia || !mes || !ano) return;
+                    const chave = `${mes}/${ano}`; // exemplo: 04/2025
+                    resultado[chave] = (resultado[chave] || 0) + valor;
+                });
+                return resultado;
+            };
+
+            try {
+                const [entradasResp, saidasResp] = await Promise.all([
+                    fetch(entradasUrl),
+                    fetch(saidasUrl)
+                ]);
+
+                const entradasData = await entradasResp.json();
+                const saidasData = await saidasResp.json();
+
+                const entradasPorMes = agruparPorMes(entradasData);
+                const saidasPorMes = agruparPorMes(saidasData);
+
+                const meses = Array.from(new Set([
+                    ...Object.keys(entradasPorMes),
+                    ...Object.keys(saidasPorMes)
+                ])).sort((a, b) => {
+                    const [ma, aa] = a.split('/').map(Number);
+                    const [mb, ab] = b.split('/').map(Number);
+                    return aa !== ab ? aa - ab : ma - mb;
+                });
+
+                const entradasValores = meses.map(m => entradasPorMes[m] || 0);
+                const saidasValores = meses.map(m => saidasPorMes[m] || 0);
+
+                const ctx = document.getElementById('financeChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: meses.map(m => `Mês ${m}`),
+                        datasets: [
+                            {
+                                label: 'Entradas',
+                                data: entradasValores,
+                                backgroundColor: '#10B981'
+                            },
+                            {
+                                label: 'Saídas',
+                                data: saidasValores,
+                                backgroundColor: '#EF4444'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'R$'
+                                }
+                            }
+                        }
+                    }
+                });
+
+            } catch (error) {
+                console.error('Erro ao carregar ou processar os dados:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadFinanceChart);
+    </script>
+</body>
+
+</html>

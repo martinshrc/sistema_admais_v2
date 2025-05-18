@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Estoque</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <style>
+        .chart-container {
+            position: relative;
+            height: 100%;
+            width: 100%;
+        }
+
+        .alert-pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 font-sans">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="mb-8">
+            <div class="flex justify-between items-start gap-4 mb-2">
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
+                        <i class="fas fa-boxes text-blue-500 mr-3"></i>
+                        Controle de Estoque
+                    </h1>
+                </div>
+                <a href="index.html"
+                    class="flex items-center text-blue-500 hover:text-blue-700 transition-colors text-sm md:text-base">
+                    <i class="fas fa-home mr-2"></i>
+                    Início
+                </a>
+
+            </div>
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                <p class="text-gray-700">
+                    Visualize rapidamente o status do estoque e saiba o que precisa de reposição.
+                    Dados atualizados automaticamente da planilha de controle.
+                </p>
+                <p class="text-sm text-gray-500 mt-2">
+                    Última atualização: <span id="lastUpdated">carregando...</span>
+                </p>
+            </div>
+
+        </header>
+
+        <!-- Filters -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                    <select id="categoryFilter"
+                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="all">Todas categorias</option>
+                        <option value="Eletrônicos">Eletrônicos</option>
+                        <option value="Embalagens">Embalagens</option>
+                        <option value="Peças">Peças</option>
+                        <option value="Matéria-prima">Matéria-prima</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Limite de alerta</label>
+                    <input type="number" id="alertThreshold" value="10" min="1"
+                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div class="flex items-end">
+                    <button id="applyFilters"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition duration-300">
+                        Aplicar Filtros
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-md p-4 border-l-4 border-blue-500">
+                <p class="text-sm text-gray-500">Total de Itens</p>
+                <p class="text-2xl font-bold text-gray-800" id="totalItems">--</p>
+                <p class="text-xs text-gray-500">em estoque</p>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-4 border-l-4 border-green-500">
+                <p class="text-sm text-gray-500">Categorias</p>
+                <p class="text-2xl font-bold text-gray-800" id="totalCategories">--</p>
+                <p class="text-xs text-gray-500">diferentes</p>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-4 border-l-4 border-amber-500">
+                <p class="text-sm text-gray-500">Valor Total</p>
+                <p class="text-2xl font-bold text-gray-800" id="totalValue">R$ --</p>
+                <p class="text-xs text-gray-500">em produtos</p>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-4 border-l-4 border-red-500">
+                <p class="text-sm text-gray-500">Itens críticos</p>
+                <p class="text-2xl font-bold text-gray-800" id="criticalItems">--</p>
+                <p class="text-xs text-gray-500">abaixo do limite</p>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <!-- Bar Chart -->
+            <div class="bg-white rounded-lg shadow-md p-4">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Estoque por Categoria</h3>
+                <div class="chart-container">
+                    <canvas id="inventoryBarChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Alerts Section -->
+            <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                <div class="bg-red-50 p-4 border-b-4 border-red-500">
+                    <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                        <i class="fas fa-exclamation-triangle text-red-500 mr-2"></i>
+                        Itens para Reposição
+                    </h3>
+                    <p class="text-sm text-gray-600">Produtos com quantidade abaixo de <span
+                            id="currentThreshold">10</span> unidades</p>
+                </div>
+                <div class="overflow-x-auto max-h-96">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Produto</th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Categoria</th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Estoque</th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Mínimo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alertsTableBody" class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="4" class="px-6 py-4 text-center text-gray-500">Carregando dados...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Full Data Table -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden mb-8">
+            <div class="p-4 border-b">
+                <h3 class="text-lg font-semibold text-gray-800">Inventário Completo</h3>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Código</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Produto</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Categoria</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Estoque</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Mínimo</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Preço Unit.</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Valor Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventoryTableBody" class="bg-white divide-y divide-gray-200">
+                        <tr>
+                            <td colspan="7" class="px-6 py-4 text-center text-gray-500">Carregando dados...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Google Sheets API configuration
+        const spreadsheetId = 'YOUR_SPREADSHEET_ID'; // Replace with your Google Sheet ID
+        const sheetName = 'Estoque';
+        const apiKey = 'YOUR_API_KEY'; // Replace with your Google API key
+
+        // Chart instance
+        let inventoryBarChart;
+
+        // Colors for charts
+        const chartColors = {
+            blue: '#3B82F6',
+            green: '#10B981',
+            purple: '#8B5CF6',
+            amber: '#F59E0B',
+            red: '#EF4444',
+            indigo: '#6366F1',
+            pink: '#EC4899',
+            cyan: '#06B6D4'
+        };
+
+        // Load data from Google Sheets
+        async function loadData() {
+            try {
+                // Show loading state
+                document.getElementById('lastUpdated').textContent = 'carregando...';
+
+                // Fetch data from Google Sheets
+                const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`);
+                const data = await response.json();
+
+                // Process data
+                const rows = data.values;
+                const headers = rows[0];
+                const inventoryData = [];
+
+                for (let i = 1; i < rows.length; i++) {
+                    const row = rows[i];
+                    const item = {};
+
+                    for (let j = 0; j < headers.length; j++) {
+                        item[headers[j]] = row[j];
+                    }
+
+                    inventoryData.push(item);
+                }
+
+                // Update last updated time
+                const now = new Date();
+                document.getElementById('lastUpdated').textContent = now.toLocaleString('pt-BR');
+
+                // Update charts and tables
+                updateCharts(inventoryData);
+                updateKPICards(inventoryData);
+                updateAlertsTable(inventoryData);
+                updateInventoryTable(inventoryData);
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('lastUpdated').textContent = 'erro ao carregar dados';
+            }
+        }
+
+        // Update all charts with new data
+        function updateCharts(data) {
+            // Get current threshold
+            const threshold = parseInt(document.getElementById('alertThreshold').value);
+            document.getElementById('currentThreshold').textContent = threshold;
+
+            // Filter data based on selected category
+            const categoryFilter = document.getElementById('categoryFilter').value;
+            const filteredData = categoryFilter === 'all'
+                ? data
+                : data.filter(item => item.Categoria === categoryFilter);
+
+            // Update bar chart
+            updateBarChart(filteredData);
+        }
+
+        // Update bar chart with inventory by category
+        function updateBarChart(data) {
+            // Group data by category
+            const categories = {};
+
+            data.forEach(item => {
+                if (!categories[item.Categoria]) {
+                    categories[item.Categoria] = {
+                        count: 0,
+                        quantity: 0,
+                        value: 0
+                    };
+                }
+
+                categories[item.Categoria].count += 1;
+                categories[item.Categoria].quantity += parseInt(item.Quantidade);
+                categories[item.Categoria].value += parseFloat(item['Preço Unitário']) * parseInt(item.Quantidade);
+            });
+
+            const categoryNames = Object.keys(categories);
+            const quantities = categoryNames.map(name => categories[name].quantity);
+
+            // Get canvas context
+            const ctx = document.getElementById('inventoryBarChart').getContext('2d');
+
+            // Destroy previous chart if exists
+            if (inventoryBarChart) {
+                inventoryBarChart.destroy();
+            }
+
+            // Create new chart
+            inventoryBarChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: categoryNames,
+                    datasets: [{
+                        label: 'Quantidade em Estoque',
+                        data: quantities,
+                        backgroundColor: [
+                            chartColors.blue,
+                            chartColors.green,
+                            chartColors.amber,
+                            chartColors.purple,
+                            chartColors.indigo,
+                            chartColors.cyan,
+                            chartColors.pink
+                        ],
+                        borderColor: [
+                            chartColors.blue,
+                            chartColors.green,
+                            chartColors.amber,
+                            chartColors.purple,
+                            chartColors.indigo,
+                            chartColors.cyan,
+                            chartColors.pink
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Distribuição do Estoque por Categoria',
+                            font: {
+                                size: 16
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                afterLabel: function (context) {
+                                    const category = context.label;
+                                    const value = categories[category].value.toFixed(2);
+                                    return `Valor total: R$ ${value}`;
+                                }
+                            }
+                        },
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Quantidade'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update KPI cards with summary data
+        function updateKPICards(data) {
+            // Calculate totals
+            let totalItems = 0;
+            let totalValue = 0;
+            const categories = new Set();
+
+            data.forEach(item => {
+                totalItems += parseInt(item.Quantidade);
+                totalValue += parseFloat(item['Preço Unitário']) * parseInt(item.Quantidade);
+                categories.add(item.Categoria);
+            });
+
+            // Get critical items count
+            const threshold = parseInt(document.getElementById('alertThreshold').value);
+            const criticalItems = data.filter(item => parseInt(item.Quantidade) < threshold).length;
+
+            // Update DOM elements
+            document.getElementById('totalItems').textContent = totalItems.toLocaleString('pt-BR');
+            document.getElementById('totalCategories').textContent = categories.size;
+            document.getElementById('totalValue').textContent = `R$ ${totalValue.toFixed(2)}`;
+            document.getElementById('criticalItems').textContent = criticalItems;
+        }
+
+        // Update alerts table with critical items
+        function updateAlertsTable(data) {
+            const tableBody = document.getElementById('alertsTableBody');
+            tableBody.innerHTML = '';
+
+            // Get threshold and filter critical items
+            const threshold = parseInt(document.getElementById('alertThreshold').value);
+            const criticalItems = data.filter(item => parseInt(item.Quantidade) < threshold);
+
+            if (criticalItems.length === 0) {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td colspan="4" class="px-6 py-4 text-center text-gray-500">
+                        <i class="fas fa-check-circle text-green-500 mr-2"></i>
+                        Nenhum item crítico no momento
+                    </td>
+                `;
+                tableBody.appendChild(row);
+                return;
+            }
+
+            // Sort by quantity (lowest first)
+            criticalItems.sort((a, b) => parseInt(a.Quantidade) - parseInt(b.Quantidade));
+
+            // Add rows to table
+            criticalItems.forEach(item => {
+                const isVeryLow = parseInt(item.Quantidade) < (threshold / 2);
+
+                const row = document.createElement('tr');
+                row.className = isVeryLow ? 'bg-red-50 alert-pulse' : '';
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.Produto}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.Categoria}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold ${isVeryLow ? 'text-red-600' : 'text-amber-600'}">${item.Quantidade}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item['Estoque Mínimo'] || '--'}</td>
+                `;
+
+                tableBody.appendChild(row);
+            });
+        }
+
+        // Update full inventory table
+        function updateInventoryTable(data) {
+            const tableBody = document.getElementById('inventoryTableBody');
+            tableBody.innerHTML = '';
+
+            // Add rows to table
+            data.forEach(item => {
+                const quantity = parseInt(item.Quantidade);
+                const minStock = item['Estoque Mínimo'] ? parseInt(item['Estoque Mínimo']) : 0;
+                const unitPrice = parseFloat(item['Preço Unitário']);
+                const totalValue = (quantity * unitPrice).toFixed(2);
+
+                const isCritical = quantity < minStock;
+                const isBelowThreshold = quantity < parseInt(document.getElementById('alertThreshold').value);
+
+                const row = document.createElement('tr');
+                if (isCritical) row.className = 'bg-red-50';
+                else if (isBelowThreshold) row.className = 'bg-amber-50';
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.Código || '--'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.Produto}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.Categoria}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${isCritical ? 'text-red-600 font-bold' : isBelowThreshold ? 'text-amber-600' : 'text-gray-500'}">${quantity}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${minStock || '--'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">R$ ${unitPrice.toFixed(2)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">R$ ${totalValue}</td>
+                `;
+
+                tableBody.appendChild(row);
+            });
+        }
+
+        // Initialize the dashboard
+        document.addEventListener('DOMContentLoaded', function () {
+            // Load data initially
+            loadData();
+
+            // Set up filter button
+            document.getElementById('applyFilters').addEventListener('click', function () {
+                loadData();
+            });
+
+            // Set up auto-refresh every 5 minutes
+            setInterval(loadData, 5 * 60 * 1000);
+        });
+    </script>
+</body>
+
+</html>

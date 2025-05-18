@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro Financeiro | Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'finance-green': '#10b981',
+                        'finance-red': '#ef4444',
+                        'finance-blue': '#3b82f6',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .input-error {
+            border-color: #ef4444;
+            box-shadow: 0 0 0 1px #ef4444;
+        }
+
+        .success-message {
+            animation: fadeInOut 3s ease-in-out forwards;
+        }
+
+        @keyframes fadeInOut {
+            0% {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            10% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            90% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            100% {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+        }
+
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="mb-8">
+            <div class="flex justify-between items-center">
+                <h1 class="text-3xl font-bold text-gray-800">
+                    <i class="fas fa-chart-line text-finance-blue mr-2"></i>
+                    Registro Financeiro
+                </h1>
+                <div class="flex justify-end gap-4">
+                    <a href="index.html"
+                        class="flex items-center bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded transition-colors">
+                        <i class="fas fa-home mr-2 text-blue-500"></i>
+                        Início
+                    </a>
+                    <a href="financeiro.html"
+                        class="flex items-center bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition-colors">
+                        <i class="fas fa-tachometer-alt mr-2"></i>
+                        Dashboard
+                    </a>
+                </div>
+            </div>
+            <p class="text-gray-600 mt-2">Preencha os dados abaixo para registrar uma nova movimentação financeira</p>
+        </header>
+
+        <!-- Success Message (hidden by default) -->
+        <div id="successMessage"
+            class="success-message hidden fixed top-20 right-8 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50">
+            <strong class="font-bold">Sucesso!</strong>
+            <span class="block sm:inline"> Movimentação registrada!</span>
+        </div>
+
+        <!-- Warning Message (hidden by default) -->
+        <div id="warningMessage"
+            class="hidden fixed top-20 right-8 bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded z-50">
+            <strong class="font-bold">Atenção!</strong>
+            <span class="block sm:inline"> Movimentação já registrada. Verifique os dados.</span>
+        </div>
+
+        <!-- Error Message (hidden by default) -->
+        <div id="errorMessage"
+            class="hidden fixed top-20 right-8 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50">
+            <strong class="font-bold">Erro!</strong>
+            <span class="block sm:inline" id="errorText">Ocorreu um erro inesperado.</span>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex flex-col lg:flex-row gap-8">
+            <!-- Form Section -->
+            <div class="w-full lg:w-2/3">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-6">
+                        <i class="fas fa-edit mr-2"></i>Nova Movimentação
+                    </h2>
+
+                    <form id="financeForm" class="space-y-4">
+                        <!-- Transaction Type -->
+                        <div>
+                            <label for="transactionType" class="block text-sm font-medium text-gray-700 mb-1">
+                                Tipo da Movimentação <span class="text-red-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <select id="transactionType" name="transactionType"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-finance-blue focus:border-finance-blue transition-colors">
+                                    <option value="" disabled selected>Selecione o tipo</option>
+                                    <option value="entrada" class="text-finance-green">💰 Entrada</option>
+                                    <option value="saida" class="text-finance-red">🛒 Saída</option>
+                                </select>
+                                <div
+                                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                                    <i class="fas fa-chevron-down"></i>
+                                </div>
+                            </div>
+                            <p id="typeError" class="hidden text-red-500 text-xs mt-1">Por favor, selecione o tipo de
+                                movimentação</p>
+                        </div>
+
+                        <!-- Invoice Number -->
+                        <div>
+                            <label for="invoiceNumber" class="block text-sm font-medium text-gray-700 mb-1">
+                                Número da Nota Fiscal <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="invoiceNumber" name="invoiceNumber"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-finance-blue focus:border-finance-blue transition-colors"
+                                placeholder="Ex: 123456">
+                            <p id="invoiceError" class="hidden text-red-500 text-xs mt-1">Por favor, insira um número de
+                                nota fiscal válido (6-10 dígitos)</p>
+                        </div>
+
+                        <!-- Client/Supplier Name -->
+                        <div>
+                            <label for="clientName" class="block text-sm font-medium text-gray-700 mb-1">
+                                Nome do Cliente/Fornecedor <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="clientName" name="clientName"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-finance-blue focus:border-finance-blue transition-colors"
+                                placeholder="Ex: Empresa XYZ Ltda" maxlength="100">
+                            <p id="nameError" class="hidden text-red-500 text-xs mt-1">Por favor, insira um nome válido
+                                (máx. 100 caracteres)</p>
+                        </div>
+
+                        <!-- Amount -->
+                        <div>
+                            <label for="amount" class="block text-sm font-medium text-gray-700 mb-1">
+                                Valor Total (R$) <span class="text-red-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <span class="text-gray-500">R$</span>
+                                </div>
+                                <input type="text" id="amount" name="amount"
+                                    class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-finance-blue focus:border-finance-blue transition-colors"
+                                    placeholder="Ex: 1.234,56">
+                            </div>
+                            <p id="amountError" class="hidden text-red-500 text-xs mt-1">Por favor, insira um valor
+                                válido (formato: 1.234,56 ou 1234.56)</p>
+                        </div>
+
+                        <!-- Date -->
+                        <div>
+                            <label for="transactionDate" class="block text-sm font-medium text-gray-700 mb-1">
+                                Data da Movimentação
+                            </label>
+                            <div class="relative">
+                                <input type="date" id="transactionDate" name="transactionDate"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-finance-blue focus:border-finance-blue transition-colors">
+                                <div
+                                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                                    <i class="fas fa-calendar-alt"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="flex flex-col sm:flex-row gap-4 pt-4">
+                            <button type="submit" id="submitBtn"
+                                class="flex-1 bg-finance-blue hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors flex items-center justify-center">
+                                <span id="submitText">Registrar Movimentação</span>
+                                <i id="submitSpinner" class="fas fa-spinner spinner hidden ml-2"></i>
+                            </button>
+                            <button type="button" id="clearBtn"
+                                class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-md transition-colors">
+                                Limpar Formulário
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Recent Transactions -->
+            <div class="w-full lg:w-1/3">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-6">
+                        <i class="fas fa-history mr-2"></i>Últimas Movimentações
+                    </h2>
+
+                    <div class="space-y-4">
+                        <div id="recentTransactions" class="space-y-3">
+                            <!-- This will be populated by JavaScript -->
+                            <div class="text-center py-8 text-gray-500">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <p>Carregando movimentações recentes...</p>
+                            </div>
+                        </div>
+
+                        <a href="#" class="block text-center text-finance-blue hover:text-blue-700 transition-colors">
+                            <i class="fas fa-list mr-1"></i> Ver todas as movimentações
+                            <!--colocar pra ver uma representação da planilha, mas com validação de senha-->
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Set today's date as default
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('transactionDate').value = today;
+
+            // Form elements
+            const form = document.getElementById('financeForm');
+            const transactionType = document.getElementById('transactionType');
+            const invoiceNumber = document.getElementById('invoiceNumber');
+            const clientName = document.getElementById('clientName');
+            const amount = document.getElementById('amount');
+            const transactionDate = document.getElementById('transactionDate');
+
+            // Error elements
+            const typeError = document.getElementById('typeError');
+            const invoiceError = document.getElementById('invoiceError');
+            const nameError = document.getElementById('nameError');
+            const amountError = document.getElementById('amountError');
+
+            // Buttons
+            const submitBtn = document.getElementById('submitBtn');
+            const submitText = document.getElementById('submitText');
+            const submitSpinner = document.getElementById('submitSpinner');
+            const clearBtn = document.getElementById('clearBtn');
+
+            // Messages
+            const successMessage = document.getElementById('successMessage');
+            const warningMessage = document.getElementById('warningMessage');
+            const errorMessage = document.getElementById('errorMessage');
+            const errorText = document.getElementById('errorText');
+
+            // Recent transactions container
+            const recentTransactions = document.getElementById('recentTransactions');
+
+            // Mock data for recent transactions (in a real app, this would come from Google Sheets)
+            const mockRecentTransactions = [
+                { type: 'entrada', invoice: '789456', name: 'Cliente A', amount: '2.500,00', date: '2023-07-15' },
+                { type: 'saida', invoice: '789455', name: 'Fornecedor B', amount: '1.200,50', date: '2023-07-14' },
+                { type: 'entrada', invoice: '789454', name: 'Cliente C', amount: '3.750,25', date: '2023-07-13' },
+                { type: 'saida', invoice: '789453', name: 'Fornecedor D', amount: '890,00', date: '2023-07-12' },
+                { type: 'entrada', invoice: '789452', name: 'Cliente E', amount: '5.000,00', date: '2023-07-10' }
+            ];
+
+            // Helper functions
+            function showSuccess() {
+                successMessage.classList.remove('hidden');
+                setTimeout(() => successMessage.classList.add('hidden'), 3000);
+            }
+
+            function showWarning() {
+                warningMessage.classList.remove('hidden');
+                setTimeout(() => warningMessage.classList.add('hidden'), 5000);
+            }
+
+            function showError(message) {
+                errorText.textContent = message;
+                errorMessage.classList.remove('hidden');
+                setTimeout(() => errorMessage.classList.add('hidden'), 5000);
+            }
+
+            // Format currency
+            function formatCurrency(value) {
+                return parseFloat(value).toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            }
+
+            // Format date
+            function formatDate(dateString) {
+                const options = { day: '2-digit', month: '2-digit', year: 'numeric' };
+                return new Date(dateString).toLocaleDateString('pt-BR', options);
+            }
+
+            // Sanitize inputs (prevention against XSS)
+            /* 
+            // ATENÇÃO: Implementar em produção!
+            function sanitizeInput(text) {
+                return text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            }
+            */
+
+            // Display recent transactions
+            function displayRecentTransactions(transactions) {
+                recentTransactions.innerHTML = '';
+
+                if (transactions.length === 0) {
+                    recentTransactions.innerHTML = '<p class="text-gray-500 text-center py-4">Nenhuma movimentação recente encontrada</p>';
+                    return;
+                }
+
+                transactions.forEach(transaction => {
+                    const transactionElement = document.createElement('div');
+                    transactionElement.className = `p-3 border rounded-md ${transaction.type === 'entrada' ? 'border-finance-green bg-green-50' : 'border-finance-red bg-red-50'}`;
+
+                    transactionElement.innerHTML = `
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="font-medium">${transaction.name}</span>
+                            <span class="${transaction.type === 'entrada' ? 'text-finance-green' : 'text-finance-red'} font-semibold">
+                                R$ ${transaction.amount}
+                            </span>
+                        </div>
+                        <div class="flex justify-between text-sm text-gray-600">
+                            <span>NF: ${transaction.invoice}</span>
+                            <span>${formatDate(transaction.date)}</span>
+                        </div>
+                    `;
+
+                    recentTransactions.appendChild(transactionElement);
+                });
+            }
+
+            // Simulate loading recent transactions (in a real app, this would be an API call)
+            setTimeout(() => {
+                displayRecentTransactions(mockRecentTransactions);
+            }, 1000);
+
+            // Validate invoice number (remove leading zeros)
+            invoiceNumber.addEventListener('blur', function () {
+                let value = this.value.trim();
+                if (value) {
+                    // Remove leading zeros
+                    value = value.replace(/^0+/, '');
+                    this.value = value;
+                }
+            });
+
+            // Format currency input
+            amount.addEventListener('blur', function () {
+                let value = this.value.trim();
+                if (value) {
+                    // Replace dots with nothing and comma with dot for parsing
+                    const parsedValue = parseFloat(value.replace(/\./g, '').replace(',', '.'));
+
+                    if (!isNaN(parsedValue)) {
+                        this.value = formatCurrency(parsedValue);
+                    }
+                }
+            });
+
+            // Clear form
+            clearBtn.addEventListener('click', function () {
+                form.reset();
+                document.getElementById('transactionDate').value = today;
+
+                // Remove error states
+                transactionType.classList.remove('input-error');
+                invoiceNumber.classList.remove('input-error');
+                clientName.classList.remove('input-error');
+                amount.classList.remove('input-error');
+
+                typeError.classList.add('hidden');
+                invoiceError.classList.add('hidden');
+                nameError.classList.add('hidden');
+                amountError.classList.add('hidden');
+            });
+
+            // Validate form
+            function validateForm() {
+                let isValid = true;
+
+                // Reset error states
+                transactionType.classList.remove('input-error');
+                invoiceNumber.classList.remove('input-error');
+                clientName.classList.remove('input-error');
+                amount.classList.remove('input-error');
+
+                typeError.classList.add('hidden');
+                invoiceError.classList.add('hidden');
+                nameError.classList.add('hidden');
+                amountError.classList.add('hidden');
+
+                // Validate transaction type
+                if (!transactionType.value) {
+                    transactionType.classList.add('input-error');
+                    typeError.classList.remove('hidden');
+                    isValid = false;
+                }
+
+                // Validate invoice number (6-10 digits)
+                const invoiceValue = invoiceNumber.value.trim();
+                if (!invoiceValue || !/^\d{6,10}$/.test(invoiceValue)) {
+                    invoiceNumber.classList.add('input-error');
+                    invoiceError.textContent = "Nota fiscal deve ter 6 a 10 dígitos";
+                    invoiceError.classList.remove('hidden');
+                    isValid = false;
+                }
+
+                // Validate client name
+                const nameValue = clientName.value.trim();
+                if (!nameValue || nameValue.length > 100) {
+                    clientName.classList.add('input-error');
+                    nameError.classList.remove('hidden');
+                    isValid = false;
+                }
+
+                // Validate amount
+                const amountValue = amount.value.trim();
+                const numericValue = parseFloat(amountValue.replace(/\./g, '').replace(',', '.'));
+
+                if (!amountValue || !/^[\d.,]+$/.test(amountValue)) {
+                    amount.classList.add('input-error');
+                    amountError.textContent = "Formato inválido (use 1.234,56 ou 1234.56)";
+                    amountError.classList.remove('hidden');
+                    isValid = false;
+                } else if (numericValue <= 0) {
+                    amount.classList.add('input-error');
+                    amountError.textContent = "O valor deve ser maior que zero";
+                    amountError.classList.remove('hidden');
+                    isValid = false;
+                }
+
+                return isValid;
+            }
+
+            // Form submission
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+
+                if (!validateForm()) {
+                    return;
+                }
+
+                // Show loading state
+                submitText.textContent = 'Registrando...';
+                submitSpinner.classList.remove('hidden');
+                submitBtn.disabled = true;
+
+                // Prepare data
+                const formData = {
+                    type: transactionType.value,
+                    invoice: invoiceNumber.value.trim(),
+                    name: clientName.value.trim(), // Em produção, usar sanitizeInput()
+                    amount: amount.value.trim(),
+                    date: transactionDate.value || today
+                };
+
+                /* 
+                // INTEGRAÇÃO COM GOOGLE SHEETS (COMENTADA PARA USO FUTURO)
+                // 1. Crie um script no Google Apps Script
+                // 2. Publique como uma Web App
+                // 3. Substitua a URL abaixo
+                const scriptURL = 'SUA_URL_DO_APPS_SCRIPT';
+                
+                fetch(scriptURL, {
+                    method: 'POST',
+                    body: JSON.stringify(formData),
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showSuccess();
+                        form.reset();
+                        // Atualize a lista de transações recentes aqui
+                    } else {
+                        showError(data.message || "Erro ao registrar");
+                    }
+                })
+                .catch(error => {
+                    showError("Falha na conexão. Dados salvos localmente.");
+                    // Implemente localStorage como fallback aqui
+                })
+                .finally(() => {
+                    submitBtn.disabled = false;
+                    submitSpinner.classList.add('hidden');
+                    submitText.textContent = 'Registrar Movimentação';
+                });
+                */
+
+                // Mock implementation (remover quando usar a integração real)
+                setTimeout(() => {
+                    // Check for duplicate (mock check)
+                    const isDuplicate = mockRecentTransactions.some(t =>
+                        t.invoice === formData.invoice && t.amount === formData.amount
+                    );
+
+                    if (isDuplicate) {
+                        showWarning();
+                    } else {
+                        // Add to recent transactions (mock)
+                        mockRecentTransactions.unshift({
+                            type: formData.type,
+                            invoice: formData.invoice,
+                            name: formData.name,
+                            amount: formData.amount,
+                            date: formData.date
+                        });
+
+                        // Update UI
+                        displayRecentTransactions(mockRecentTransactions);
+                        showSuccess();
+                        form.reset();
+                        document.getElementById('transactionDate').value = today;
+                    }
+
+                    // Reset button state
+                    submitText.textContent = 'Registrar Movimentação';
+                    submitSpinner.classList.add('hidden');
+                    submitBtn.disabled = false;
+                }, 1500);
+            });
+
+            /* 
+            // FALLBACK OFFLINE (EXEMPLO PARA IMPLEMENTAÇÃO FUTURA)
+            function saveForLater(data) {
+                const pending = JSON.parse(localStorage.getItem("pendingTransactions") || "[]");
+                pending.push(data);
+                localStorage.setItem("pendingTransactions", JSON.stringify(pending));
+            }
+            
+            function sendPendingTransactions() {
+                const pending = JSON.parse(localStorage.getItem("pendingTransactions") || []);
+                if (pending.length === 0) return;
+                
+                // Envie cada transação pendente para o Google Sheets
+                // Limpe o localStorage após sucesso
+            }
+            */
+        });
+    </script>
+</body>
+
+</html>
